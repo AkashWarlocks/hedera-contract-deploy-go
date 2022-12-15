@@ -18,18 +18,19 @@ type contract struct {
 	SourceMap string `json:"sourceMap"`
 }
 
+var client *hedera.Client
+
 func main() {
-	var client *hedera.Client
 	var err error
 
 	// load .env file from given path
- 	// we keep it empty it will load .env from current directory
-  	err = godotenv.Load(".env")
+	// we keep it empty it will load .env from current directory
+	err = godotenv.Load(".env")
 
-  	if err != nil {
+	if err != nil {
 		println(err.Error(), ": Error loading .env file")
 
-  	}
+	}
 	// net := os.Getenv("HEDERA_NETWORK")
 
 	client = hedera.ClientForTestnet()
@@ -63,7 +64,7 @@ func main() {
 	}
 
 	// R contents from hello_world.json file
-	rawContract, err := ioutil.ReadFile("./notarization.json")
+	rawContract, err := ioutil.ReadFile("./aebmes.json")
 	if err != nil {
 		println(err.Error(), ": error reading notarization.json")
 		return
@@ -110,47 +111,48 @@ func main() {
 	fmt.Printf("The new contract ID is %v\n", newContractId)
 	fmt.Printf("The new solidity Address ID is %v\n", solidityAddress)
 
-	// Call smart contract function
-	functionVariables :=  hedera.NewContractFunctionParameters().AddString("Test doc").AddString("user1").AddString("test_doc")
-	
-	transaction := hedera.NewContractExecuteTransaction().
-					   SetContractID(newContractId).
-					   SetGas(10000000).
-					   SetFunction("setData", functionVariables)
-	//Sign with the client operator private key to pay for the transaction and submit the query to a Hedera network
-	txResponse, err := transaction.Execute(client)
-	if err != nil {
-		panic(err)
-	}			
+	//generateAccount()
+	//generateAccount()
+	// // Call smart contract function
+	// functionVariables :=  hedera.NewContractFunctionParameters().AddString("Test doc").AddString("user1").AddString("test_doc")
 
-	// Get Transaction Record 
-	txRecord, err := txResponse.GetRecord(client)
-	contractResult,err :=txRecord.GetContractExecuteResult()	
-	//resultData,err :=  contractResutlt.ContractFunc
-	//fmt.Println(contractResult.)
-	hash := contractResult.GetBytes32(0)
-	hashString := string(hash[:])
-	timestamp := contractResult.GetUint256(1)
-	timestampString := string(timestamp[:])
-	fmt.Println("contract result")
-	fmt.Println(hash)
-	fmt.Println(hashString)
+	// transaction := hedera.NewContractExecuteTransaction().
+	// 				   SetContractID(newContractId).
+	// 				   SetGas(10000000).
+	// 				   SetFunction("setData", functionVariables)
+	// //Sign with the client operator private key to pay for the transaction and submit the query to a Hedera network
+	// txResponse, err := transaction.Execute(client)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	fmt.Println(timestamp)
-	fmt.Println(timestampString)
-	fmt.Println(txRecord.CallResult.LogInfo[0].Data)
-	//Request the receipt of the transaction
-	txReceipt, err := txResponse.GetReceipt(client)
-	if err != nil {
-		panic(err)
-	}
+	// // Get Transaction Record
+	// txRecord, err := txResponse.GetRecord(client)
+	// contractResult,err :=txRecord.GetContractExecuteResult()
+	// //resultData,err :=  contractResutlt.ContractFunc
+	// //fmt.Println(contractResult.)
+	// hash := contractResult.GetBytes32(0)
+	// hashString := string(hash[:])
+	// timestamp := contractResult.GetUint256(1)
+	// timestampString := string(timestamp[:])
+	// fmt.Println("contract result")
+	// fmt.Println(hash)
+	// fmt.Println(hashString)
 
-	//Get the transaction consensus status
-	transactionStatus := txReceipt.Status
+	// fmt.Println(timestamp)
+	// fmt.Println(timestampString)
+	// fmt.Println(txRecord.CallResult.LogInfo[0].Data)
+	// //Request the receipt of the transaction
+	// txReceipt, err := txResponse.GetReceipt(client)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	fmt.Printf("The transaction consensus status %v\n", transactionStatus)
-	
-	
+	// //Get the transaction consensus status
+	// transactionStatus := txReceipt.Status
+
+	// fmt.Printf("The transaction consensus status %v\n", transactionStatus)
+
 	// Getter Function
 	// Get the record
 	// byteCodeTransactionRecord, err := byteCodeTransactionID.GetRecord(client)
@@ -240,5 +242,50 @@ func main() {
 	// 	return
 	// }
 
-//	fmt.Printf("Status of transaction deletion: %v\n", deleteTransactionReceipt.Status)
+	//	fmt.Printf("Status of transaction deletion: %v\n", deleteTransactionReceipt.Status)
+}
+
+func generateAccount() {
+	newKey, err := hedera.GeneratePrivateKey()
+	if err != nil {
+		println(err.Error(), ": error generating PrivateKey}")
+		return
+	}
+
+	fmt.Printf("private = %v\n", newKey)
+	fmt.Printf("public = %v\n", newKey.PublicKey())
+
+	// Create account
+	// The only required property here is `key`
+	transactionResponse, err := hedera.NewAccountCreateTransaction().
+		// The key that must sign each transfer out of the account.
+		SetKey(newKey.PublicKey()).
+		// If true, this account's key must sign any transaction depositing into this account (in
+		// addition to all withdrawals)
+		SetReceiverSignatureRequired(false).
+		// The maximum number of tokens that an Account can be implicitly associated with. Defaults to 0
+		// and up to a maximum value of 1000.
+		SetMaxAutomaticTokenAssociations(1).
+		// The memo associated with the account
+		SetTransactionMemo("go sdk example create_account/main.go").
+		// The account is charged to extend its expiration date every this many seconds. If it doesn't
+		// have enough balance, it extends as long as possible. If it is empty when it expires, then it
+		// is deleted.
+		Execute(client)
+	if err != nil {
+		println(err.Error(), ": error executing account create transaction}")
+		return
+	}
+
+	// Get receipt to see if transaction succeeded, and has the account ID
+	transactionReceipt, err := transactionResponse.GetReceipt(client)
+	if err != nil {
+		println(err.Error(), ": error getting receipt}")
+		return
+	}
+
+	// Get account ID out of receipt
+	newAccountID := *transactionReceipt.AccountID
+
+	fmt.Printf("account = %v\n", newAccountID)
 }
